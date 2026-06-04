@@ -14,7 +14,11 @@ interface Player {
   player_name: string;
   photo: string;
   total_points: number;
+  collected_points: number;
   rank: number;
+  team_name?: string | null;
+  ticket_status?: string;
+  ticket_id?: string;
 }
 
 interface LeaderboardResponse {
@@ -32,11 +36,15 @@ interface LeaderboardComponentProps {
 
 export interface Prize {
   position: number;
-  prize_id: string;
+  reward_instance_id: string;
+  prize_instance_id: string;
+  prize_type: string;
   prize_text: string;
   prize_photo: string;
   prize_value: string;
   prize_cost: string;
+  min_points: number | null;
+  max_points: number | null;
 }
 
 const { width, height } = Dimensions.get("window");
@@ -59,19 +67,26 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
       setError(null);
 
       const response = await fetch(
-        `${API_BASE_URL}/api/our-activity-performances/leaderboard${tournamentId ? `?tournament_id=${tournamentId}` : ""}`,
+        `${API_BASE_URL}/api/our-activity-performances/leaderboard-players${tournamentId ? `?tournament_id=${tournamentId}&exclude_unregistered=true` : "?exclude_unregistered=true"}`,
       );
       if (!response.ok) {
         throw new Error("Failed to fetch leaderboard");
       }
 
-      const data: Player[] = await response.json();
+      const data: any[] = await response.json();
 
-      // Convert API output → UI expected structure
       const normalized = data.map((item) => ({
-        ...item,
-        player_photo: item.photo,
-        collected_points: item.total_points,
+        player_id: item.player_id,
+        player_name: item.display_name,
+        photo: item.photo || "",
+        player_photo: item.photo || "",
+        total_points: item.collected_points,
+        collected_points: item.collected_points,
+        rank: item.rank,
+        bonus_points: 0,
+        ticket_id: item.ticket_id,
+        team_name: item.team_name || null,
+        ticket_status: item.ticket_status || "purchased",
       }));
 
       setLeaderboardData(normalized);
@@ -87,9 +102,10 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
     fetchLeaderboard();
   }, [fetchLeaderboard]);
 
-  const getImageUri = (photoPath: string) => {
-    if (!photoPath || photoPath === "None" || photoPath === "") return "";
-    return `${AWS_BASE_URL}/${photoPath}`;
+  const getImageUri = (photoPath: string): { uri: string } | null => {
+    if (!photoPath || photoPath === "None" || photoPath === "") return null;
+    if (photoPath.toLowerCase().endsWith(".svg")) return null; // SVGs unsupported, fall back to avatar
+    return { uri: `${AWS_BASE_URL}/${photoPath}?t=${Date.now()}` };
   };
 
   const getMedalImage = (rank: number) => {
@@ -105,8 +121,26 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
     }
   };
 
-  const getPrizeForRank = (rank: number): Prize | null => {
+  const isPointsBased = prizes.some(
+    (p) => p.min_points !== null && p.min_points !== undefined,
+  );
+
+  const getPrizeForPlayer = (
+    rank: number,
+    totalPoints: number,
+  ): Prize | null => {
     if (!prizes || !Array.isArray(prizes)) return null;
+    if (isPointsBased) {
+      return (
+        prizes.find(
+          (p) =>
+            p.min_points !== null &&
+            p.max_points !== null &&
+            totalPoints >= p.min_points &&
+            totalPoints <= p.max_points,
+        ) ?? null
+      );
+    }
     return prizes.find((p) => p.position === rank) ?? null;
   };
 
@@ -129,9 +163,8 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
         <View style={styles.avatarContainer}>
           <Image
             source={
-              getImageUri(player.photo)
-                ? { uri: getImageUri(player.photo) }
-                : require("../assets/images/avatar.jpg")
+              getImageUri(player.photo) ??
+              require("../assets/images/avatar.jpg")
             }
             style={[styles.avatar, isCenter && styles.centerAvatar]}
           />
@@ -143,9 +176,30 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
         <View style={styles.pointsContainer}>
           <Text style={styles.pointsText}>{player.total_points} Points</Text>
         </View>
-
+        {player.ticket_status && player.ticket_status !== "approved" && (
+          <View
+            style={{
+              backgroundColor: "#fff3e0",
+              borderRadius: 6,
+              paddingHorizontal: 4,
+              paddingVertical: 1,
+              marginTop: 2,
+              alignSelf: "flex-start",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 9,
+                color: "#e65100",
+                fontFamily: "Inter-Bold",
+              }}
+            >
+              {player.ticket_status.replace(/_/g, " ")}
+            </Text>
+          </View>
+        )}
         {(() => {
-          const prize = getPrizeForRank(player.rank);
+          const prize = getPrizeForPlayer(player.rank, player.total_points);
           if (!prize) return null;
           return (
             <>
@@ -160,8 +214,8 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
                 <Image
                   source={{ uri: prize.prize_photo }}
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: 30,
+                    height: 30,
                     resizeMode: "contain",
                     marginBottom: 4,
                   }}
@@ -169,7 +223,7 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
               ) : null}
               <Text style={styles.prizeText}>{prize.prize_text}</Text>
               <Text style={[styles.prizeText, { color: "#43a62f" }]}>
-                {prize.prize_value}
+                ₹{prize.prize_value}
               </Text>
             </>
           );
@@ -201,31 +255,27 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
   return (
     <View style={styles.container}>
       {/* Top 3 Players */}
-      {topThree.length > 0 && (
-        <View style={styles.topThreeContainer}>
-          <View style={styles.topThreeRow}>
-            {topThree.map((player, index) => (
-              <View
-                key={player.player_id}
-                style={[
-                  styles.firstPlayerWrapper,
-                  index === 1 && styles.middlePlayer,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.firstThreeName,
-                    isCurrentPlayer(player.player_id) && styles.highlightedText,
-                  ]}
-                >
-                  #{player.rank} {player.player_name}
-                </Text>
-                <TopPlayerCard player={player} isCenter={false} />
-              </View>
-            ))}
+      <View style={styles.topThreeRow}>
+        {topThree.map((player) => (
+          <View
+            key={player.player_id}
+            style={[
+              styles.firstPlayerWrapper,
+              player.rank === 2 && styles.middlePlayer,
+            ]}
+          >
+            <Text
+              style={[
+                styles.firstThreeName,
+                isCurrentPlayer(player.player_id) && styles.highlightedText,
+              ]}
+            >
+              #{player.rank} {player.player_name}
+            </Text>
+            <TopPlayerCard player={player} isCenter={false} />
           </View>
-        </View>
-      )}
+        ))}
+      </View>
 
       {/* Table Header */}
       <View style={styles.tableHeader}>
@@ -265,9 +315,8 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
               <View style={[styles.playerInfo, { flex: 4 }]}>
                 <Image
                   source={
-                    getImageUri(player.photo)
-                      ? { uri: getImageUri(player.photo) }
-                      : require("../assets/images/avatar.jpg")
+                    getImageUri(player.photo) ??
+                    require("../assets/images/avatar.jpg")
                   }
                   style={styles.smallAvatar}
                 />
@@ -283,7 +332,10 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
 
               <View style={[styles.prizeIcon, { flex: 3 }]}>
                 {(() => {
-                  const prize = getPrizeForRank(player.rank);
+                  const prize = getPrizeForPlayer(
+                    player.rank,
+                    player.total_points,
+                  );
                   if (!prize)
                     return (
                       <Text style={{ fontSize: 12, color: "#999" }}>—</Text>
@@ -308,6 +360,16 @@ const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
                         }}
                       >
                         {prize.prize_text}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: "#43a62f",
+                          textAlign: "center",
+                          fontFamily: "Inter-Bold",
+                        }}
+                      >
+                        ₹{prize.prize_value} {/* ← added */}
                       </Text>
                     </>
                   );
@@ -365,7 +427,7 @@ const styles = StyleSheet.create({
   topThreeRow: {
     flexDirection: "row",
     justifyContent: "space-around",
-    alignItems: "flex-end",
+    alignItems: "flex-start",
   },
   topPlayerCard: {
     alignItems: "center",

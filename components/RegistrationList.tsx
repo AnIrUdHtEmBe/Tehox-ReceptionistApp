@@ -8,6 +8,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import Colors from "../theme/Colors";
@@ -69,7 +70,7 @@ export default function PreviousRegistrations({
     };
     router.push({ pathname: "/VerifyDetailsPage", params: paramsToSend });
   };
-
+  console.log(page, totalPages);
   const renderItem = ({
     item,
     index,
@@ -108,13 +109,7 @@ export default function PreviousRegistrations({
       <Text style={styles.title}>Previous Registrations</Text>
       <View style={styles.listArea}>
         {/* ← new wrapper */}
-        {listLoading ? (
-          <ActivityIndicator
-            size="small"
-            color={Colors.accent}
-            style={{ marginTop: 20 }}
-          />
-        ) : registrations && registrations.length > 0 ? (
+        {registrations && registrations.length > 0 ? (
           <FlatList
             data={registrations}
             keyExtractor={(item) => item.player_id}
@@ -127,26 +122,33 @@ export default function PreviousRegistrations({
             No previous registrations found.
           </Text>
         )}
+        {listLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="small" color={Colors.accent} />
+          </View>
+        )}
       </View>
       {/* ← close wrapper */}
       <View style={styles.pagination}>
-        <Pressable
+        <TouchableOpacity
           onPress={onPrev}
           disabled={page <= 1}
           style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+          activeOpacity={0.7}
         >
           <Text style={styles.pageBtnText}>{"<"}</Text>
-        </Pressable>
+        </TouchableOpacity>
         <Text style={styles.pageInfo}>
           {page} / {totalPages}
         </Text>
-        <Pressable
+        <TouchableOpacity
           onPress={onNext}
           disabled={page >= totalPages}
           style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+          activeOpacity={0.7}
         >
           <Text style={styles.pageBtnText}>{">"}</Text>
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -159,7 +161,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   listArea: {
-    flex: 1, // ← pushes pagination to bottom always
+    flex: 1,
   },
   title: {
     fontSize: 20,
@@ -218,28 +220,41 @@ const styles = StyleSheet.create({
   pagination: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end", // ← right aligned
+    justifyContent: "flex-end",
     paddingVertical: 32,
-    paddingHorizontal: 5, // ← align with list items
+    paddingHorizontal: 5,
     gap: 16,
   },
   pageBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    width: 28,
+    height: 28,
     borderRadius: 6,
-    backgroundColor: "#418ED6", // ← your color
+    backgroundColor: "#418ED6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   pageBtnDisabled: {
-    backgroundColor: "#B0B0B0", // ← grey instead of opacity
+    backgroundColor: "#B0B0B0",
   },
   pageBtnText: {
     color: "white",
-    fontSize: 11, // ← smaller
+    fontSize: 11,
     fontFamily: "Inter-Medium",
   },
   pageInfo: {
-    fontSize: 11, // ← smaller
+    fontSize: 11,
     color: Colors.text,
     fontFamily: "Inter-Medium",
+    width: 40,
+    textAlign: "center",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

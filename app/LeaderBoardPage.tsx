@@ -17,6 +17,7 @@ export default function SportsLeaderboard() {
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const API_BASE_URL = process.env.EXPO_PUBLIC_API;
   const intervalRef = useRef<any>(null);
+  const AWS_BASE_URL = process.env.EXPO_PUBLIC_CF_DOMAIN;
 
   // Timer countdown
   useEffect(() => {
@@ -38,17 +39,27 @@ export default function SportsLeaderboard() {
 
   useEffect(() => {
     if (!tournamentId) return;
+
     const fetchPrizes = async () => {
       try {
         const res = await fetch(
           `${API_BASE_URL}/api/rewards/leaderboard_prizes?tournament_id=${tournamentId}`,
         );
-        const data = await res.json();
-        setPrizes(data);
+        const data: Prize[] = await res.json();
+
+        // Prepend CF domain to photo paths
+        const withPhotos = data.map((p) => ({
+          ...p,
+          prize_photo: p.prize_photo
+            ? `${process.env.EXPO_PUBLIC_CF_DOMAIN}/${p.prize_photo}?t=${Date.now()}`
+            : "",
+        }));
+        setPrizes(withPhotos);
       } catch (err) {
         console.error("Failed to fetch prizes:", err);
       }
     };
+
     fetchPrizes();
   }, [tournamentId]);
 

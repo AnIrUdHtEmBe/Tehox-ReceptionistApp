@@ -12,7 +12,9 @@ import {
 import { showToast } from "../utils/Toast";
 import SearchButton from "./SearchButton";
 
-// InputFields contains input fields for unique code and mobile data based on that api call for player's info is made
+// InputFields contains input fields for unique code and mobile number.
+// Player ID search → existing VerifyDetailsPage (unchanged).
+// Phone number search → new PlayerSearchResultScreen (new approval flow).
 export default function InputFields() {
   const [playerId, setPlayerId] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
@@ -22,32 +24,36 @@ export default function InputFields() {
 
   const router = useRouter();
 
-  // Function for making api call
   const handleSearchPress = async () => {
-    let searchValue = "";
+    const isPhoneSearch = !!mobileNumber && !playerId;
+    const isPlayerIdSearch = !!playerId;
 
-    if (playerId) {
-      searchValue = playerId;
-    } else if (mobileNumber) {
-      searchValue = mobileNumber;
-    } else {
+    if (!playerId && !mobileNumber) {
       Alert.alert(
         "Input Required",
         "Please enter a Player ID or Mobile Number to search.",
       );
       return;
     }
-    setSearchLoading(true);
 
+    // ── Phone search → new approval flow ──────────────────────────────────
+    if (isPhoneSearch) {
+      router.push({
+        pathname: "/Playersearchresultscreen",
+        params: { phone: mobileNumber },
+      });
+      setMobileNumber("");
+      return;
+    }
+
+    // ── Player ID search → existing VerifyDetailsPage (unchanged) ─────────
+    setSearchLoading(true);
     try {
-      const encodedValue = encodeURIComponent(searchValue);
+      const encodedValue = encodeURIComponent(playerId);
       const url = `${BASE_URL}/api/player/${encodedValue}/?player_id_or_phone=${encodedValue}`;
-      console.log("📡 Calling:", url);
 
       const response = await axios.get(url);
-      console.log("✅ Response:", JSON.stringify(response.data));
 
-      // backend returns statuscode 404 when not found (not an actual 404)
       if (response.data.statuscode === "404") {
         showToast("User not found. Please register the player.");
         setTimeout(() => {
@@ -76,7 +82,6 @@ export default function InputFields() {
           playerId: response.data.player_id,
         };
 
-        console.log("📦 Params to send:", JSON.stringify(paramsToSend));
         router.push({ pathname: "/VerifyDetailsPage", params: paramsToSend });
       } else {
         showToast("User not found. Please register the player.");
@@ -85,18 +90,13 @@ export default function InputFields() {
         }, 2000);
       }
     } catch (error: any) {
-      console.log("❌ Full error:", JSON.stringify(error, null, 2));
-      console.log("❌ Message:", error?.message);
-      console.log("❌ Response data:", JSON.stringify(error?.response?.data));
-      console.log("❌ Status:", error?.response?.status);
       Alert.alert(
-        "Debug Error",
-        `${error?.message}\n\nURL: ${BASE_URL}/api/player/${encodeURIComponent(playerId || mobileNumber)}?player_id_or_phone=${encodeURIComponent(playerId || mobileNumber)}`,
+        "Error",
+        error?.message || "Something went wrong. Please try again.",
       );
     } finally {
       setSearchLoading(false);
       setPlayerId("");
-      setMobileNumber("");
     }
   };
 
@@ -113,9 +113,8 @@ export default function InputFields() {
           textAlign="center"
         />
       </View>
-      {/* Customized search button */}
+      {/* Search button — searches player ID if filled, else phone */}
       <SearchButton onPress={handleSearchPress} loading={searchLoading} />
-
       <View style={styles.inputRow}>
         <Text style={styles.orText}>or</Text>
         <TextInput
