@@ -1,24 +1,24 @@
-// REPLACE entire file with:
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFonts } from "expo-font";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { AppState } from "react-native";
+import { AppState, LogBox } from "react-native";
 import {
   TournamentProvider,
   useTournament,
 } from "../context/TournamentContext";
 
+LogBox.ignoreAllLogs();
+
 function AppCore() {
   const router = useRouter();
-  const { logout } = useTournament();
+  const { isReady, isLoggedIn, tournamentId, logout } = useTournament();
 
+  // ── Background inactivity auto-logout (30 min) ──────────────────────
   useEffect(() => {
     let backgroundTimer: ReturnType<typeof setTimeout> | null = null;
 
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "background") {
-        // Only logout if backgrounded for more than 30 minutes
         backgroundTimer = setTimeout(
           () => {
             logout();
@@ -26,7 +26,6 @@ function AppCore() {
           30 * 60 * 1000,
         );
       } else if (nextState === "active") {
-        // User came back before timeout — cancel it
         if (backgroundTimer) {
           clearTimeout(backgroundTimer);
           backgroundTimer = null;
@@ -40,11 +39,21 @@ function AppCore() {
     };
   }, []);
 
+  // ── Auth + tournament guard ─────────────────────────────────────────
   useEffect(() => {
-    AsyncStorage.getItem("staff_token").then((token) => {
-      if (!token) router.replace("/LoginPage");
-    });
-  }, []);
+    if (!isReady) return;
+
+    if (!isLoggedIn) {
+      // No token — go to login (step 1: credentials)
+      router.replace("/LoginPage");
+      return;
+    }
+
+    if (!tournamentId) {
+      // Logged in but no tournament selected — go to login (shows step 2: picker)
+      router.replace("/LoginPage");
+    }
+  }, [isReady, isLoggedIn, tournamentId]);
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

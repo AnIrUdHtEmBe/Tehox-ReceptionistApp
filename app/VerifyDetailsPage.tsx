@@ -1,69 +1,75 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CheckCircle } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { CheckCircle } from "lucide-react-native";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
   Image,
   StyleSheet,
   View,
-} from 'react-native';
-import AppBar from '../components/AppBar';
-import RedirectTimer from '../components/CountDown';
-import HomeButton from '../components/HomeButton';
-import OutlineButton from '../components/OutlinedButton';
-import ProfileDetailsField from '../components/ProfileDetailsFields';
-import Colors from '../theme/Colors';
+} from "react-native";
+import AppBar from "../components/AppBar";
+import RedirectTimer from "../components/CountDown";
+import HomeButton from "../components/HomeButton";
+import OutlineButton from "../components/OutlinedButton";
+import ProfileDetailsField from "../components/ProfileDetailsFields";
+import Colors from "../theme/Colors";
 
-const { height } = Dimensions.get('window');
+const { height } = Dimensions.get("window");
 
 // Verify Details Page contains information about player just to recheck
 export default function VerifyDetailsPage() {
-  const { name, mobile, photoUri, photoType, avatarName, email, gender, gamerTag, playerId } = useLocalSearchParams();
+  const {
+    name,
+    mobile,
+    photoUri,
+    photoType,
+    avatarName,
+    email,
+    gender,
+    gamerTag,
+    playerId,
+  } = useLocalSearchParams();
   const router = useRouter();
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-// get avatar key based on avatar name which is passed from pervious route.
+  // get avatar key based on avatar name which is passed from pervious route.
   const avatarKey = Array.isArray(avatarName) ? avatarName[0] : avatarName;
 
-// list of all avatar images
+  // list of all avatar images
   const avatarImages: Record<string, any> = {
-    avatar1: require('../assets/images/avatar1.png'),
-    avatar2: require('../assets/images/avatar2.png'),
-    avatar3: require('../assets/images/avatar3.png'),
-    avatar4: require('../assets/images/avatar4.png'),
-    avatar5: require('../assets/images/avatar5.png'),
+    avatar1: require("../assets/images/avatar1.png"),
+    avatar2: require("../assets/images/avatar2.png"),
+    avatar3: require("../assets/images/avatar3.png"),
+    avatar4: require("../assets/images/avatar4.png"),
+    avatar5: require("../assets/images/avatar5.png"),
   };
-
 
   const handleGoHomePress = () => {
     router.dismissAll();
   };
 
-  const handleTournamentLeaderboardPress = () =>{
-    
+  const handleTournamentLeaderboardPress = () => {
     const paramsToSend = {
       playerId,
-      name,      
-    }
+      name,
+    };
 
-    router.replace(
-      {
-        pathname:"/LeaderBoardPage",
-        params: paramsToSend
-      }
-    )
-  }
+    router.replace({
+      pathname: "/LeaderBoardPage",
+      params: paramsToSend,
+    });
+  };
 
-// Confirm wheater it is image or avatar based on that genrate url to render image
+  // Confirm wheater it is image or avatar based on that genrate url to render image
   const imageSource =
-    photoType === 'photo' && photoUri
+    photoType === "photo" && photoUri
       ? { uri: Array.isArray(photoUri) ? photoUri[0] : photoUri }
       : avatarKey && avatarImages[avatarKey]
-      ? avatarImages[avatarKey]
-      : null;
-  const isRemoteImage = photoType === 'photo' && photoUri;
+        ? avatarImages[avatarKey]
+        : null;
+  const isRemoteImage = photoType === "photo" && photoUri;
 
   const handleImageLoad = () => {
     setImageLoading(false);
@@ -79,8 +85,8 @@ export default function VerifyDetailsPage() {
       <AppBar
         title="Verify Details"
         titleFontWeight="bold"
-        onMenuPress={() => console.log('Menu pressed')}
-        logoSource={require('../assets/images/tehologo.png')}
+        onMenuPress={() => console.log("Menu pressed")}
+        logoSource={require("../assets/images/tehologo.png")}
       />
 
       <View style={styles.contentArea}>
@@ -118,12 +124,16 @@ export default function VerifyDetailsPage() {
             formData={{
               name: name,
               gamerTag: gamerTag,
-              email:email,
+              email: email,
               mobile: mobile,
               // gender: gender,
-            }} onChange={()=>{{}} }
+            }}
+            onChange={() => {
+              {
+              }
+            }}
             isGenderNeeded={false}
-            />
+          />
         </View>
 
         {(!isRemoteImage || !imageLoading) && (
@@ -136,7 +146,20 @@ export default function VerifyDetailsPage() {
               width={170}
               height={40}
               containerStyle={{ marginBottom: 10 }}
-              text='Tournament Leaderboard'
+              text="KYC Flow"
+              onPress={() => {
+                const phoneVal = Array.isArray(mobile) ? mobile[0] : mobile;
+                router.replace({
+                  pathname: "/Playersearchresultscreen",
+                  params: { phone: phoneVal },
+                });
+              }}
+            />
+            <OutlineButton
+              width={170}
+              height={40}
+              containerStyle={{ marginBottom: 10 }}
+              text="Tournament Leaderboard"
               onPress={handleTournamentLeaderboardPress}
             />
             <HomeButton onPress={handleGoHomePress} />
@@ -154,32 +177,32 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: height * 0.04,
   },
   detailsFieldSpacing: {
     marginTop: -20,
   },
   imageContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
     width: 100,
     height: 100,
   },
   loaderContainer: {
-    position: 'absolute',
+    position: "absolute",
     width: 150,
     height: 150,
     borderRadius: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
     zIndex: 1,
   },
   profileImage: {
-    position: 'relative',
-    overflow: 'hidden',
+    position: "relative",
+    overflow: "hidden",
     width: 100,
     height: 100,
     borderRadius: 100,
@@ -188,12 +211,12 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   checkBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 1,
     right: 4,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 15,
     padding: 1,
     zIndex: 2,
   },
-}); 
+});

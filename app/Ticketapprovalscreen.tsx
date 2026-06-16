@@ -2145,7 +2145,8 @@ export default function TicketApprovalScreen() {
                 (offer: any) =>
                   offer.discount_id !== currentOfferId &&
                   offer.final_price_if_chosen != null &&
-                  offer.final_price_if_chosen <= (state.booking_amount || 0),
+                  offer.final_price_if_chosen <=
+                    (state.discount_snapshot?.original_price || 0),
               );
               if (betterOffers.length === 0) return null;
               return (
@@ -2734,7 +2735,10 @@ export default function TicketApprovalScreen() {
               {!showBucket ? (
                 <ActionButton
                   label="Apply Receptionist Bucket Discount"
-                  onPress={() => setShowBucket(true)}
+                  onPress={() => {
+                    setBucketAmount(extraPending.toFixed(2));
+                    setShowBucket(true);
+                  }}
                   variant="outline"
                 />
               ) : (

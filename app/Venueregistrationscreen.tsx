@@ -43,6 +43,8 @@ interface TeamMemberForm {
   looked_up_profile_updated: boolean;
   lookup_loading: boolean;
   lookup_done: boolean;
+  lookup_confirmed: boolean; // true after user taps Yes/No on found banner, or not_found
+  lookup_found_data: any | null; // holds raw API data until user confirms
 }
 
 const GENDER_OPTIONS = ["Male", "Female", "Other"];
@@ -186,6 +188,8 @@ function TeamMemberCard({
   buyerPhone,
   buyerEmail,
   onLookup,
+  onPrefill,
+  onResetLookup,
 }: {
   index: number;
   member: TeamMemberForm;
@@ -197,11 +201,20 @@ function TeamMemberCard({
   buyerPhone: string;
   buyerEmail: string;
   onLookup: () => void;
+  onPrefill: () => void;
+  onResetLookup: () => void;
 }) {
   const isLocked =
-    member.looked_up_player_id !== null && member.looked_up_profile_updated;
-  const isFound = member.lookup_done && member.looked_up_player_id !== null;
-  const isNotFound = member.lookup_done && member.looked_up_player_id === null;
+    member.lookup_confirmed &&
+    member.looked_up_player_id !== null &&
+    member.looked_up_profile_updated;
+  const isFound =
+    member.lookup_done &&
+    !member.lookup_confirmed &&
+    member.lookup_found_data !== null;
+  const isNotFound =
+    member.lookup_confirmed && member.looked_up_player_id === null;
+  const lookupConfirmed = member.lookup_confirmed;
 
   return (
     <View style={styles.memberCard}>
@@ -222,78 +235,179 @@ function TeamMemberCard({
 
       {/* Phone — always first, with lookup button */}
       <FieldLabel label="Phone" required />
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <View style={{ flex: 1 }}>
-          <StyledInput
-            value={member.phone}
-            onChangeText={(t) => {
-              const cleaned = t.replace(/[^0-9]/g, "").slice(0, 10);
-              // Block buyer phone when opted out
-              if (buyerOptedOut && cleaned === buyerPhone) return;
-              onChange("phone", cleaned);
-              // Reset lookup state when phone changes
-              if (member.lookup_done) {
-                onChange("lookup_done", false);
-                onChange("looked_up_player_id", null);
-                onChange("looked_up_profile_updated", false);
-              }
-            }}
-            placeholder="10-digit mobile number"
-            keyboardType="numeric"
-            maxLength={10}
-          />
-        </View>
-        <TouchableOpacity
-          style={[
-            {
+
+      {!lookupConfirmed ? (
+        <>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            <View style={{ flex: 1 }}>
+              <StyledInput
+                value={member.phone}
+                onChangeText={(t) => {
+                  const cleaned = t.replace(/[^0-9]/g, "").slice(0, 10);
+                  onChange("phone", cleaned);
+                  if (member.lookup_done) {
+                    onChange("lookup_done", false);
+                    onChange("lookup_confirmed", false);
+                    onChange("lookup_found_data", null);
+                    onChange("looked_up_player_id", null);
+                    onChange("looked_up_profile_updated", false);
+                  }
+                }}
+                placeholder="10-digit mobile number"
+                keyboardType="numeric"
+                maxLength={10}
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                {
+                  paddingHorizontal: 12,
+                  paddingVertical: 11,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 80,
+                  backgroundColor: "#f0f0f0",
+                  borderColor: "#ddd",
+                },
+                (member.phone.length < 10 || member.lookup_loading) && {
+                  opacity: 0.5,
+                },
+              ]}
+              onPress={onLookup}
+              disabled={member.phone.length < 10 || member.lookup_loading}
+            >
+              {member.lookup_loading ? (
+                <ActivityIndicator size="small" color="#2d7a2d" />
+              ) : (
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontFamily: "Roboto-SemiBold",
+                    color: "#555",
+                  }}
+                >
+                  Look Up
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Found banner — waiting for user confirm */}
+          {isFound && member.lookup_found_data && (
+            <View
+              style={{
+                backgroundColor: "#e8f5e9",
+                borderWidth: 1,
+                borderColor: "#2d7a2d",
+                borderRadius: 8,
+                padding: 10,
+                marginTop: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: "Roboto-SemiBold",
+                  color: "#1b5e20",
+                  marginBottom: 2,
+                }}
+              >
+                Player found:{" "}
+                {member.lookup_found_data.name ||
+                  member.lookup_found_data.player_name}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: "Roboto-Regular",
+                  color: "#2d7a2d",
+                  marginBottom: 8,
+                }}
+              >
+                Do you want to pre-fill their details?
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  onPress={onPrefill}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    backgroundColor: "#2d7a2d",
+                    borderRadius: 6,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontFamily: "Roboto-SemiBold",
+                      color: "#fff",
+                    }}
+                  >
+                    Yes, Pre-fill
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onResetLookup}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    backgroundColor: "#f0f0f0",
+                    borderRadius: 6,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontFamily: "Roboto-SemiBold",
+                      color: "#555",
+                    }}
+                  >
+                    No, Re-enter
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </>
+      ) : (
+        /* Confirmed — locked phone display with Change button */
+        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+          <View style={{ flex: 1 }}>
+            <StyledInput
+              value={member.phone}
+              onChangeText={() => {}}
+              placeholder=""
+              editable={false}
+            />
+          </View>
+          <TouchableOpacity
+            onPress={onResetLookup}
+            style={{
               paddingHorizontal: 12,
               paddingVertical: 11,
               borderRadius: 8,
               borderWidth: 1,
+              borderColor: "#ddd",
+              backgroundColor: "#f0f0f0",
               alignItems: "center",
               justifyContent: "center",
-              minWidth: 80,
-            },
-            isFound
-              ? { backgroundColor: "#e8f5e9", borderColor: "#2d7a2d" }
-              : { backgroundColor: "#f0f0f0", borderColor: "#ddd" },
-            (member.phone.length < 10 || member.lookup_loading) && {
-              opacity: 0.5,
-            },
-          ]}
-          onPress={onLookup}
-          disabled={
-            member.phone.length < 10 || member.lookup_loading || isFound
-          }
-        >
-          {member.lookup_loading ? (
-            <ActivityIndicator size="small" color="#2d7a2d" />
-          ) : (
+            }}
+          >
             <Text
               style={{
                 fontSize: 12,
                 fontFamily: "Roboto-SemiBold",
-                color: isFound ? "#2d7a2d" : "#555",
+                color: "#555",
               }}
             >
-              {isFound ? "Found ✓" : "Check"}
+              Change
             </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Buyer phone conflict warning */}
-      {buyerOptedOut && member.phone === buyerPhone && (
-        <Text
-          style={{
-            fontSize: 12,
-            color: "#c62828",
-            fontFamily: "Roboto-Regular",
-            marginTop: 4,
-          }}
-        >
-          Buyer's phone cannot be used for team members.
-        </Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Not found notice */}
@@ -318,92 +432,100 @@ function TeamMemberCard({
         </View>
       )}
 
-      {/* Photo */}
-      <PhotoCapture
-        uri={member.photoUri}
-        label="Member Photo"
-        onPress={isLocked ? () => {} : onCameraPress}
-      />
-      {isLocked && (
-        <Text
-          style={{
-            fontSize: 11,
-            color: "#888",
-            fontFamily: "Roboto-Regular",
-            textAlign: "center",
-            marginBottom: 6,
-          }}
-        >
-          Photo from existing record
-        </Text>
+      {/* Form fields — hidden until lookup confirmed */}
+      {lookupConfirmed && (
+        <>
+          {/* Photo */}
+          <PhotoCapture
+            uri={member.photoUri}
+            label="Member Photo"
+            onPress={isLocked ? () => {} : onCameraPress}
+          />
+          {isLocked && (
+            <Text
+              style={{
+                fontSize: 11,
+                color: "#888",
+                fontFamily: "Roboto-Regular",
+                textAlign: "center",
+                marginBottom: 6,
+              }}
+            >
+              Photo from existing record
+            </Text>
+          )}
+
+          <FieldLabel label="Name" required />
+          <StyledInput
+            value={member.player_name}
+            onChangeText={(t) => onChange("player_name", t)}
+            placeholder="Full name"
+            editable={!isLocked}
+          />
+
+          <FieldLabel label="Gamer Tag" required />
+          <StyledInput
+            value={member.gamer_tag}
+            onChangeText={(t) => onChange("gamer_tag", t)}
+            placeholder="In-game name"
+            editable={!isLocked}
+          />
+
+          <FieldLabel label="Gender" required />
+          {isLocked ? (
+            <StyledInput
+              value={member.gender}
+              onChangeText={() => {}}
+              placeholder="Gender"
+              editable={false}
+            />
+          ) : (
+            <GenderSelector
+              value={member.gender}
+              onChange={(g) => onChange("gender", g)}
+            />
+          )}
+
+          <FieldLabel label="Date of Birth" required />
+          {isLocked ? (
+            <StyledInput
+              value={
+                member.dob
+                  ? member.dob.toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : "Not set"
+              }
+              onChangeText={() => {}}
+              placeholder="Date of birth"
+              editable={false}
+            />
+          ) : (
+            <DOBPicker
+              value={member.dob}
+              onChange={(d) => onChange("dob", d)}
+            />
+          )}
+
+          <FieldLabel label="Email" required />
+          <StyledInput
+            value={member.email}
+            onChangeText={(t) => {
+              if (
+                buyerOptedOut &&
+                t.trim().toLowerCase() === buyerEmail.trim().toLowerCase()
+              )
+                return;
+              onChange("email", t);
+            }}
+            placeholder="Email"
+            keyboardType="email-address"
+            editable={!isLocked}
+          />
+        </>
       )}
-
-      <FieldLabel label="Name" required />
-      <StyledInput
-        value={member.player_name}
-        onChangeText={(t) => onChange("player_name", t)}
-        placeholder="Full name"
-        editable={!isLocked}
-      />
-
-      <FieldLabel label="Gamer Tag" />
-      <StyledInput
-        value={member.gamer_tag}
-        onChangeText={(t) => onChange("gamer_tag", t)}
-        placeholder="In-game name"
-        editable={!isLocked}
-      />
-
-      <FieldLabel label="Gender" required />
-      {isLocked ? (
-        <StyledInput
-          value={member.gender}
-          onChangeText={() => {}}
-          placeholder="Gender"
-          editable={false}
-        />
-      ) : (
-        <GenderSelector
-          value={member.gender}
-          onChange={(g) => onChange("gender", g)}
-        />
-      )}
-
-      <FieldLabel label="Date of Birth" required />
-      {isLocked ? (
-        <StyledInput
-          value={
-            member.dob
-              ? member.dob.toLocaleDateString("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })
-              : "Not set"
-          }
-          onChangeText={() => {}}
-          placeholder="Date of birth"
-          editable={false}
-        />
-      ) : (
-        <DOBPicker value={member.dob} onChange={(d) => onChange("dob", d)} />
-      )}
-
-      <FieldLabel label="Email" required />
-      <StyledInput
-        value={member.email}
-        onChangeText={(t) => {
-          if (
-            buyerOptedOut &&
-            t.trim().toLowerCase() === buyerEmail.trim().toLowerCase()
-          )
-            return;
-          onChange("email", t);
-        }}
-        placeholder="Email"
-        keyboardType="email-address"
-        editable={!isLocked}
-      />
     </View>
   );
 }
@@ -638,6 +760,8 @@ export default function VenueRegistrationScreen() {
         looked_up_profile_updated: false,
         lookup_loading: false,
         lookup_done: false,
+        lookup_confirmed: false,
+        lookup_found_data: null,
       })),
     );
   }, [buyerOptedOut]);
@@ -666,6 +790,8 @@ export default function VenueRegistrationScreen() {
         looked_up_profile_updated: false,
         lookup_loading: false,
         lookup_done: false,
+        lookup_confirmed: false,
+        lookup_found_data: null,
       }),
     );
     setTeamMembers(newMembers);
@@ -698,6 +824,8 @@ export default function VenueRegistrationScreen() {
         looked_up_profile_updated: false,
         lookup_loading: false,
         lookup_done: false,
+        lookup_confirmed: false,
+        lookup_found_data: null,
       },
     ]);
   };
@@ -731,6 +859,8 @@ export default function VenueRegistrationScreen() {
 
     if (!buyerOptedOut) {
       if (!leaderName.trim()) return "Leader name is required";
+      if (!leaderGamerTag.trim()) return "Leader gamer tag is required";
+      if (!leaderEmail.trim()) return "Leader email is required";
       if (!leaderGender) return "Leader gender is required";
       if (!leaderDOB) return "Leader date of birth is required";
       if (!existingPlayerId && !leaderPassword.trim())
@@ -750,11 +880,18 @@ export default function VenueRegistrationScreen() {
 
       for (let i = 0; i < teamMembers.length; i++) {
         const m = teamMembers[i];
-        if (!m.player_name.trim()) return `Member ${i + 1}: name is required`;
+
+        if (!m.lookup_confirmed)
+          return `Player ${i + 1}: complete the phone lookup first`;
+
+        if (!m.player_name.trim()) return `Player ${i + 1}: name is required`;
+        if (!m.gamer_tag.trim())
+          return `Player ${i + 1}: gamer tag is required`;
         if (!m.phone || m.phone.length !== 10)
-          return `Member ${i + 1}: valid 10-digit phone is required`;
-        if (!m.gender) return `Member ${i + 1}: gender is required`;
-        if (!m.dob) return `Member ${i + 1}: date of birth is required`;
+          return `Player ${i + 1}: valid 10-digit phone is required`;
+        if (!m.email.trim()) return `Player ${i + 1}: email is required`;
+        if (!m.gender) return `Player ${i + 1}: gender is required`;
+        if (!m.dob) return `Player ${i + 1}: date of birth is required`;
       }
     }
 
@@ -1180,54 +1317,139 @@ export default function VenueRegistrationScreen() {
     const member = teamMembers[index];
     if (member.phone.length !== 10) return;
 
-    // Block buyer phone
-    if (buyerOptedOut && member.phone === phone) {
+    // ── Duplicate phone check across all other members + buyer ───────────
+    const otherPhones = teamMembers
+      .map((m, i) => (i !== index ? m.phone : null))
+      .filter(Boolean);
+
+    if (member.phone === phone) {
       Alert.alert(
         "Not allowed",
         "Buyer's phone cannot be used for a team member.",
       );
       return;
     }
+    if (otherPhones.includes(member.phone)) {
+      Alert.alert(
+        "Duplicate number",
+        "This mobile number is already used by another team member.",
+      );
+      return;
+    }
 
     updateMember(index, "lookup_loading", true);
+    updateMember(index, "lookup_found_data", null);
+
     try {
       const res = await fetch(
-        `${BASE_URL}/api/player/${encodeURIComponent(member.phone)}/?player_id_or_phone=${encodeURIComponent(member.phone)}`,
+        `${BASE_URL}/api/player/{player_id}?player_id_or_phone=${encodeURIComponent(member.phone)}`,
       );
       const data = await res.json();
 
       if (!res.ok || data.statuscode === "404" || !data.player_id) {
-        updateMember(index, "lookup_done", true);
-        updateMember(index, "looked_up_player_id", null);
-        updateMember(index, "looked_up_profile_updated", false);
+        // Not found — confirm immediately, unlock form with this phone
+        setTeamMembers((prev) =>
+          prev.map((m, i) =>
+            i === index
+              ? {
+                  ...m,
+                  lookup_done: true,
+                  lookup_confirmed: true,
+                  lookup_loading: false,
+                  looked_up_player_id: null,
+                  looked_up_profile_updated: false,
+                  lookup_found_data: null,
+                }
+              : m,
+          ),
+        );
         return;
       }
 
-      // Found — pre-fill fields
-      const updates: Partial<TeamMemberForm> = {
-        looked_up_player_id: data.player_id,
-        looked_up_profile_updated: data.profile_updated || false,
-        lookup_done: true,
-        lookup_loading: false,
-        player_name: data.name || data.player_name || member.player_name,
-        gamer_tag: data.gamer_tag || member.gamer_tag,
-        email: data.email || member.email,
-        gender: data.gender || member.gender,
-        dob: data.dob ? new Date(data.dob * 1000) : member.dob,
-        photoUri: data.photo
-          ? `${process.env.EXPO_PUBLIC_CF_DOMAIN}/${data.photo}`
-          : member.photoUri,
-      };
-
+      // Found — store data, show banner, wait for user to confirm
       setTeamMembers((prev) =>
-        prev.map((m, i) => (i === index ? { ...m, ...updates } : m)),
+        prev.map((m, i) =>
+          i === index
+            ? {
+                ...m,
+                lookup_done: true,
+                lookup_confirmed: false,
+                lookup_loading: false,
+                lookup_found_data: data,
+              }
+            : m,
+        ),
       );
     } catch {
-      updateMember(index, "lookup_done", true);
-      updateMember(index, "looked_up_player_id", null);
-    } finally {
-      updateMember(index, "lookup_loading", false);
+      setTeamMembers((prev) =>
+        prev.map((m, i) =>
+          i === index
+            ? {
+                ...m,
+                lookup_done: true,
+                lookup_confirmed: true,
+                lookup_loading: false,
+                looked_up_player_id: null,
+                looked_up_profile_updated: false,
+                lookup_found_data: null,
+              }
+            : m,
+        ),
+      );
     }
+  };
+
+  const handleMemberPrefill = (index: number) => {
+    const member = teamMembers[index];
+    const data = member.lookup_found_data;
+    if (!data) return;
+
+    setTeamMembers((prev) =>
+      prev.map((m, i) =>
+        i === index
+          ? {
+              ...m,
+              looked_up_player_id: data.player_id,
+              looked_up_profile_updated: data.profile_updated || false,
+              lookup_confirmed: true,
+              lookup_found_data: null,
+              player_name: data.name || data.player_name || m.player_name,
+              gamer_tag: data.gamer_tag || m.gamer_tag,
+              email: data.email || m.email,
+              gender: data.gender || m.gender,
+              dob: data.dob ? new Date(data.dob * 1000) : m.dob,
+              photoUri: data.photo
+                ? `${process.env.EXPO_PUBLIC_CF_DOMAIN}/${data.photo}`
+                : m.photoUri,
+            }
+          : m,
+      ),
+    );
+  };
+
+  const handleMemberResetLookup = (index: number) => {
+    setTeamMembers((prev) =>
+      prev.map((m, i) =>
+        i === index
+          ? {
+              ...m,
+              phone: "",
+              player_name: "",
+              gamer_tag: "",
+              email: "",
+              gender: "",
+              dob: null,
+              photoUri: null,
+              looked_up_player_id: null,
+              looked_up_profile_updated: false,
+              lookup_done: false,
+              lookup_confirmed: false,
+              lookup_loading: false,
+              lookup_found_data: null,
+            }
+          : m,
+      ),
+    );
   };
 
   // ── Render ──────────────────────────────────────────────────────────────
@@ -1407,7 +1629,7 @@ export default function VenueRegistrationScreen() {
             editable={false}
           />
 
-          <FieldLabel label="Gamer Tag" />
+          <FieldLabel label="Gamer Tag" required />
           <StyledInput
             value={leaderGamerTag}
             onChangeText={setLeaderGamerTag}
@@ -1415,7 +1637,7 @@ export default function VenueRegistrationScreen() {
             editable={!profileUpdated}
           />
 
-          <FieldLabel label="Email" />
+          <FieldLabel label="Email" required />
           <StyledInput
             value={leaderEmail}
             onChangeText={setLeaderEmail}
@@ -1490,6 +1712,8 @@ export default function VenueRegistrationScreen() {
                   buyerPhone={phone}
                   buyerEmail={existingEmail}
                   onLookup={() => handleMemberLookup(idx)}
+                  onPrefill={() => handleMemberPrefill(idx)}
+                  onResetLookup={() => handleMemberResetLookup(idx)}
                 />
               ))}
 
